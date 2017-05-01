@@ -1,0 +1,26 @@
+@(message: String)
+
+@main("Welcome Fine food reviewer") {
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="wrapper wrapper-content fadeInUp">
+                <div class="ibox-content" >
+
+
+                    @message
+
+                    <br>
+                    <br>
+                    <br>
+
+                    <a href="@routes.FileController.startParseFile()">
+                        <button>Parse file</button>
+                    </a>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
