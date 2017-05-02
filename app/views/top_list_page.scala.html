@@ -1,0 +1,22 @@
+@(message: String)(userTopList: List[AmountUserMessages])
+
+@main("Welcome Fine food reviewer") {
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="wrapper wrapper-content fadeInUp">
+                <div class="ibox-content" >
+
+                    <br><br><br>
+                    @for(user<-userTopList){
+
+                        @user.getProfileName (messages: @user.getCounterMessages)
+                        <br>
+
+                    }
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
