@@ -1,10 +1,6 @@
 
-
-
 GET        /                     controllers.ReviewerController.index()
 GET        /parse-file           controllers.FileController.startParseFile()
 GET        /get-top-lists        controllers.ReviewerController.getTopLists()
-
-
 
 GET        /assets/*file         controllers.Assets.versioned(path="/public", file: Asset)

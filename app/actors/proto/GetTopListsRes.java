@@ -1,25 +1,19 @@
 package actors.proto;
 
-import models.AmountUserMessages;
+import models.AbstractCounterMessages;
 
 import java.util.List;
+import java.util.Map;
 
 public class GetTopListsRes {
 
-    private List<AmountUserMessages> userList;
+    private Map<String, List<AbstractCounterMessages>> topListsMap;
 
-    public GetTopListsRes(List<AmountUserMessages> userList) {
-        this.userList = userList;
+    public GetTopListsRes(Map<String, List<AbstractCounterMessages>> topListsMap) {
+        this.topListsMap = topListsMap;
     }
 
-    public List<AmountUserMessages> getUserList() {
-        return userList;
-    }
-
-    @Override
-    public String toString() {
-        return "GetTopListsRes{" +
-                "userList=" + userList +
-                '}';
+    public Map<String, List<AbstractCounterMessages>> getTopListsMap() {
+        return topListsMap;
     }
 }

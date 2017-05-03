@@ -1,0 +1,11 @@
+
+- Done only 1 and 2 points in task.txt
+- Used: Akka, Play
+ ==========
+1. Make git clone project
+2. Download file with reviews: https://www.kaggle.com/snap/amazon-fine-food-reviews (300MB)
+3. Change path to file in conf/application.conf (file_system.path_to_reviews_file = "/home/user/correct_path_to.csv")
+4. in terminal: 'sbt run'
+5. in browser: 'http://localhost:9000'
+6. in browser: Push button 'Parse file' (in terminal will be logs "Parse file started" and "Parse file finished. spent" when parsing is finish)
+7. in browser: Push button 'Get TopLists'

@@ -15,9 +15,7 @@ public class FileController extends Controller {
     ActorRef workerSupervisorActor;
 
     public F.Promise<Result> startParseFile() {
-
         workerSupervisorActor.tell(new StartParseCmd(), ActorRef.noSender());
-
         return F.Promise.pure((Result) redirect(routes.ReviewerController.index()));
     }
 }

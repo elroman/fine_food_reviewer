@@ -1,5 +1,6 @@
 package modules;
 
+import actors.FoodHandlerActor;
 import actors.UserHandlerActor;
 import actors.WorkerSupervisorActor;
 import com.google.inject.AbstractModule;
@@ -10,5 +11,6 @@ public class MyModule extends AbstractModule implements AkkaGuiceSupport {
     protected void configure() {
         bindActor(WorkerSupervisorActor.class, "workerSupervisorActor");
         bindActor(UserHandlerActor.class, "userHandlerActor");
+        bindActor(FoodHandlerActor.class, "foodHandlerActor");
     }
 }

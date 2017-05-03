@@ -1,20 +1,73 @@
-@(message: String)(userTopList: List[AmountUserMessages])
+@(message: String)(userTopList: List[CounterUserActivity])(foodTopList: List[CounterCommentedFood])
 
 @main("Welcome Fine food reviewer") {
 
     <div class="row">
         <div class="col-lg-12">
-            <div class="wrapper wrapper-content fadeInUp">
+            <div class="wrapper wrapper-content">
                 <div class="ibox-content" >
-
-                    <br><br><br>
-                    @for(user<-userTopList){
-
-                        @user.getProfileName (messages: @user.getCounterMessages)
-                        <br>
-
-                    }
-
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th class="col-lg-5 col-md-5">User</th>
+                                <th class="col-lg-1 col-md-1"></th>
+                                <th class="col-lg-5 col-md-5">Product</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-lg-6 col-md-6">User</th>
+                                                <th class="col-lg-3 col-md-3">User id</th>
+                                                <th class="col-lg-3 col-md-3">Counter</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @for(user <- userTopList) {
+                                            <tr>
+                                                <td>
+                                                @user.getProfileName
+                                                </td>
+                                                <td>
+                                                @user.getId
+                                                </td>
+                                                <td>
+                                                @user.getCounter
+                                                </td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </td>
+                                <td>
+                                </td>
+                                <td>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-lg-6 col-md-6">Product id</th>
+                                                <th class="col-lg-3 col-md-3">Counter</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @for(product <- foodTopList) {
+                                            <tr>
+                                                <td>
+                                                @product.getId
+                                                </td>
+                                                <td>
+                                                @product.getCounter
+                                                </td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                    </table>
                 </div>
             </div>
         </div>

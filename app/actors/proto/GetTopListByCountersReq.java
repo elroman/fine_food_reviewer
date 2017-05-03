@@ -1,9 +1,9 @@
 package actors.proto;
 
-public class GetTopListUsersReq {
+public class GetTopListByCountersReq {
     private int top;
 
-    public GetTopListUsersReq(int top) {
+    public GetTopListByCountersReq(int top) {
         this.top = top;
     }
 

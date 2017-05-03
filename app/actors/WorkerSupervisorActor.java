@@ -1,7 +1,10 @@
 package actors;
 
 import actors.cmd.StartParseCmd;
-import actors.proto.*;
+import actors.proto.GetTopListByCountersReq;
+import actors.proto.GetTopListByCountersRes;
+import actors.proto.GetTopListsReq;
+import actors.proto.GetTopListsRes;
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.dispatch.Mapper;
@@ -10,10 +13,11 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.event.LoggingReceive;
 import akka.japi.pf.ReceiveBuilder;
-import models.AmountUserMessages;
+import models.AbstractCounterMessages;
 import models.Review;
 import play.Logger;
 import scala.PartialFunction;
+import scala.Tuple2;
 import scala.concurrent.ExecutionContextExecutor;
 import scala.concurrent.Future;
 import scala.runtime.BoxedUnit;
@@ -24,7 +28,7 @@ import javax.inject.Named;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 import static akka.pattern.Patterns.ask;
@@ -41,6 +45,10 @@ public class WorkerSupervisorActor extends AbstractActor {
     @Named("userHandlerActor")
     ActorRef userHandlerActor;
 
+    @Inject
+    @Named("foodHandlerActor")
+    ActorRef foodHandlerActor;
+
     @Override
     public PartialFunction<Object, BoxedUnit> receive() {
         return LoggingReceive.create(ReceiveBuilder
@@ -51,26 +59,16 @@ public class WorkerSupervisorActor extends AbstractActor {
 
     private void startParse(StartParseCmd cmd) {
         ResultSet resultSet = parseFileService.getResultSetFromCsv(PATH_TO_FILE);
-
-        logger.debug("=== Parse file started ===");
+        logger.debug("Parse file started");
         try {
             resultSet.next(); // first row is a head, we will skip it
-
-            int counter = 0;
             long startTime = System.nanoTime();
             while (resultSet.next()) {
-
                 Review review = getReviewFromResultSet(resultSet);
-
                 userHandlerActor.forward(review, getContext());
-                counter++;
-                if (counter % 1000 == 0) {
-                    logger.debug(" ___ parsed: {}", counter);
-                }
+                foodHandlerActor.forward(review, getContext());
             }
-
-            logger.debug("=== Parse file finished ===  spent: {}",(System.nanoTime() - startTime)/1000);
-
+            logger.debug("Parse file finished. spent: {}", (System.nanoTime() - startTime) / 1000);
         } catch (SQLException e) {
             logger.error("startParse() ERROR: {}", e);
         }
@@ -80,13 +78,18 @@ public class WorkerSupervisorActor extends AbstractActor {
         final ExecutionContextExecutor exec = getContext().system().dispatcher();
         final int top = req.getTop();
 
-        Future<List<AmountUserMessages>> userTopList = getTopUserLists(top, exec);
+        Future<List<AbstractCounterMessages>> userTopListFuture = getUserTopList(top, exec);
+        Future<List<AbstractCounterMessages>> foodTopListFuture = getFoodTopList(top, exec);
 
-        Future<GetTopListsRes> resp = userTopList
-                .map(new Mapper<List<AmountUserMessages>, GetTopListsRes>() {
-                    @Override
-                    public GetTopListsRes apply(List<AmountUserMessages> userTopList) {
-                        return new GetTopListsRes(userTopList);
+        Future<GetTopListsRes> resp = userTopListFuture.zip(foodTopListFuture)
+                .map(new Mapper<Tuple2<List<AbstractCounterMessages>, List<AbstractCounterMessages>>, GetTopListsRes>() {
+                    public GetTopListsRes apply(Tuple2<List<AbstractCounterMessages>, List<AbstractCounterMessages>> zipper) {
+
+                        HashMap<String, List<AbstractCounterMessages>> topListMap = new HashMap<>();
+                        topListMap.put("userTopList", zipper._1());
+                        topListMap.put("foodTopList", zipper._2());
+
+                        return new GetTopListsRes(topListMap);
                     }
                 }, exec)
                 .recover(new Recover<GetTopListsRes>() {
@@ -97,37 +100,45 @@ public class WorkerSupervisorActor extends AbstractActor {
                 }, exec);
 
         pipe(resp, getContext().dispatcher()).to(sender());
-
     }
 
-    private Future<List<AmountUserMessages>> getTopUserLists(int top, ExecutionContextExecutor exec) {
-        return ask(userHandlerActor, new GetTopListUsersReq(top), 5000)
-                .map(new Mapper<Object, List<AmountUserMessages>>() {
+    private Future<List<AbstractCounterMessages>> getUserTopList(int top, ExecutionContextExecutor exec) {
+        return ask(userHandlerActor, new GetTopListByCountersReq(top), 5000)
+                .map(new Mapper<Object, List<AbstractCounterMessages>>() {
                     @Override
-                    public List<AmountUserMessages> apply(Object parameter) {
-                        return ((GetTopListUsersRes) parameter).getUserList();
+                    public List<AbstractCounterMessages> apply(Object parameter) {
+                        return ((GetTopListByCountersRes) parameter).getTopList();
                     }
                 }, exec)
-                .recover(new Recover<List<AmountUserMessages>>() {
-                    public List<AmountUserMessages> recover(Throwable problem) throws Throwable {
-                        Logger.error("WorkerSupervisorActor: getTopUserLists() error: {}", problem.getMessage());
+                .recover(new Recover<List<AbstractCounterMessages>>() {
+                    public List<AbstractCounterMessages> recover(Throwable problem) throws Throwable {
+                        Logger.error("WorkerSupervisorActor: getUserTopList() error: {}", problem.getMessage());
                         return new ArrayList<>();
                     }
                 }, exec);
     }
 
+    private Future<List<AbstractCounterMessages>> getFoodTopList(int top, ExecutionContextExecutor exec) {
+        return ask(foodHandlerActor, new GetTopListByCountersReq(top), 5000)
+                .map(new Mapper<Object, List<AbstractCounterMessages>>() {
+                    @Override
+                    public List<AbstractCounterMessages> apply(Object parameter) {
+                        return ((GetTopListByCountersRes) parameter).getTopList();
+                    }
+                }, exec)
+                .recover(new Recover<List<AbstractCounterMessages>>() {
+                    public List<AbstractCounterMessages> recover(Throwable problem) throws Throwable {
+                        Logger.error("WorkerSupervisorActor: getFoodTopList() error: {}", problem.getMessage());
+                        return new ArrayList<>();
+                    }
+                }, exec);
+    }
 
     private Review getReviewFromResultSet(ResultSet resultSet) throws SQLException {
-        String userId = resultSet.getString("userId");
-        if (userId.contains("#")) {
-            userId = userId.replace("#", "_");
-            Logger.error("WorkerSupervisorActor: getReviewFromResultSet()  invalid userId : {}   will be changed on '_'", userId);
-        }
-
         return new Review(
                 resultSet.getString("id"),
                 resultSet.getString("productId"),
-                userId,
+                resultSet.getString("userId"),
                 resultSet.getString("profileName"),
                 resultSet.getString("helpfulnessNumerator"),
                 resultSet.getString("helpfulnessDenominator"),
