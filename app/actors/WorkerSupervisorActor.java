@@ -1,5 +1,18 @@
 package actors;
 
+import static akka.pattern.Patterns.ask;
+import static akka.pattern.Patterns.pipe;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+
 import actors.cmd.StartParseCmd;
 import actors.proto.GetTopListByCountersReq;
 import actors.proto.GetTopListByCountersRes;
@@ -13,8 +26,11 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.event.LoggingReceive;
 import akka.japi.pf.ReceiveBuilder;
-import models.AbstractCounterMessages;
-import models.Review;
+import models.review.CommentWord;
+import models.review.Countable;
+import models.review.Product;
+import models.review.Review;
+import models.review.Reviewer;
 import play.Logger;
 import scala.PartialFunction;
 import scala.Tuple2;
@@ -23,19 +39,15 @@ import scala.concurrent.Future;
 import scala.runtime.BoxedUnit;
 import service.ParseFileService;
 
-import javax.inject.Inject;
-import javax.inject.Named;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+public class WorkerSupervisorActor
+    extends AbstractActor {
 
-import static akka.pattern.Patterns.ask;
-import static akka.pattern.Patterns.pipe;
+    private final ExecutionContextExecutor exec = getContext().system().dispatcher();
 
-public class WorkerSupervisorActor extends AbstractActor {
-    private final String PATH_TO_FILE = getContext().system().settings().config().getString("file_system.path_to_reviews_file");
+    private final String PATH_TO_FILE = getContext().system()
+        .settings()
+        .config()
+        .getString("file_system.path_to_reviews_file");
     private LoggingAdapter logger = Logging.getLogger(getContext().system(), this);
 
     @Inject
@@ -49,12 +61,20 @@ public class WorkerSupervisorActor extends AbstractActor {
     @Named("foodHandlerActor")
     ActorRef foodHandlerActor;
 
+    @Inject
+    @Named("wordHandlerActor")
+    ActorRef wordHandlerActor;
+
+    @Inject
+    @Named("textParserActor")
+    ActorRef textParserActor;
+
     @Override
     public PartialFunction<Object, BoxedUnit> receive() {
         return LoggingReceive.create(ReceiveBuilder
-                .match(StartParseCmd.class, this::startParse)
-                .match(GetTopListsReq.class, this::getTopLists)
-                .build(), getContext());
+                                         .match(StartParseCmd.class, this::startParse)
+                                         .match(GetTopListsReq.class, this::getTopLists)
+                                         .build(), getContext());
     }
 
     private void startParse(StartParseCmd cmd) {
@@ -63,10 +83,19 @@ public class WorkerSupervisorActor extends AbstractActor {
         try {
             resultSet.next(); // first row is a head, we will skip it
             long startTime = System.nanoTime();
+
+            int coun = 0;
             while (resultSet.next()) {
-                Review review = getReviewFromResultSet(resultSet);
-                userHandlerActor.forward(review, getContext());
-                foodHandlerActor.forward(review, getContext());
+                final Review review = getReviewFromResultSet(resultSet);
+                userHandlerActor.forward(review.getReviewer(), getContext());
+                foodHandlerActor.forward(review.getProduct(), getContext());
+                textParserActor.forward(review.getComment(), getContext());
+                //                review.getComment().forEach(elem -> wordHandlerActor.forward(elem, getContext()));
+
+                coun++;
+                if ((coun % 1000) == 0) {
+                    logger.debug(" == Parsed : {}", coun);
+                }
             }
             logger.debug("Parse file finished. spent: {}", (System.nanoTime() - startTime) / 1000);
         } catch (SQLException e) {
@@ -75,76 +104,78 @@ public class WorkerSupervisorActor extends AbstractActor {
     }
 
     private void getTopLists(GetTopListsReq req) {
-        final ExecutionContextExecutor exec = getContext().system().dispatcher();
+
         final int top = req.getTop();
 
-        Future<List<AbstractCounterMessages>> userTopListFuture = getUserTopList(top, exec);
-        Future<List<AbstractCounterMessages>> foodTopListFuture = getFoodTopList(top, exec);
+        Future<LinkedHashMap<Countable, Integer>> userTopListFuture = getTopList(userHandlerActor, top);
+        Future<LinkedHashMap<Countable, Integer>> foodTopListFuture = getTopList(foodHandlerActor, top);
+        Future<LinkedHashMap<Countable, Integer>> wordTopListFuture = getTopList(wordHandlerActor, top);
 
-        Future<GetTopListsRes> resp = userTopListFuture.zip(foodTopListFuture)
-                .map(new Mapper<Tuple2<List<AbstractCounterMessages>, List<AbstractCounterMessages>>, GetTopListsRes>() {
-                    public GetTopListsRes apply(Tuple2<List<AbstractCounterMessages>, List<AbstractCounterMessages>> zipper) {
+        final Future<GetTopListsRes> resp = userTopListFuture.zip(foodTopListFuture.zip(wordTopListFuture))
+            .map(new Mapper<
+                Tuple2<
+                    LinkedHashMap<Countable, Integer>,
+                    Tuple2<LinkedHashMap<Countable, Integer>,
+                        LinkedHashMap<Countable, Integer>>
+                    >,
+                GetTopListsRes>() {
+                public GetTopListsRes apply(
+                    Tuple2<
+                        LinkedHashMap<Countable, Integer>,
+                        Tuple2<LinkedHashMap<Countable, Integer>,
+                            LinkedHashMap<Countable, Integer>>
+                        > zipper
+                ) {
 
-                        HashMap<String, List<AbstractCounterMessages>> topListMap = new HashMap<>();
-                        topListMap.put("userTopList", zipper._1());
-                        topListMap.put("foodTopList", zipper._2());
+                    HashMap<String, LinkedHashMap<Countable, Integer>> topListMap = new HashMap<>();
+                    topListMap.put("userTopList", zipper._1());
+                    topListMap.put("foodTopList", zipper._2()._1());
+                    topListMap.put("wordTopList", zipper._2()._2());
 
-                        return new GetTopListsRes(topListMap);
-                    }
-                }, exec)
-                .recover(new Recover<GetTopListsRes>() {
-                    public GetTopListsRes recover(Throwable problem) throws Throwable {
-                        Logger.error("WorkerSupervisorActor: getTopLists() error: {}", problem.getMessage());
-                        return null;
-                    }
-                }, exec);
+                    return new GetTopListsRes(topListMap);
+                }
+            }, exec)
+            .recover(new Recover<GetTopListsRes>() {
+                public GetTopListsRes recover(Throwable problem) throws Throwable {
+                    Logger.error("WorkerSupervisorActor: getTopLists() error: {}", problem.getMessage());
+                    return null;
+                }
+            }, exec);
 
         pipe(resp, getContext().dispatcher()).to(sender());
     }
 
-    private Future<List<AbstractCounterMessages>> getUserTopList(int top, ExecutionContextExecutor exec) {
-        return ask(userHandlerActor, new GetTopListByCountersReq(top), 5000)
-                .map(new Mapper<Object, List<AbstractCounterMessages>>() {
-                    @Override
-                    public List<AbstractCounterMessages> apply(Object parameter) {
-                        return ((GetTopListByCountersRes) parameter).getTopList();
-                    }
-                }, exec)
-                .recover(new Recover<List<AbstractCounterMessages>>() {
-                    public List<AbstractCounterMessages> recover(Throwable problem) throws Throwable {
-                        Logger.error("WorkerSupervisorActor: getUserTopList() error: {}", problem.getMessage());
-                        return new ArrayList<>();
-                    }
-                }, exec);
-    }
-
-    private Future<List<AbstractCounterMessages>> getFoodTopList(int top, ExecutionContextExecutor exec) {
-        return ask(foodHandlerActor, new GetTopListByCountersReq(top), 5000)
-                .map(new Mapper<Object, List<AbstractCounterMessages>>() {
-                    @Override
-                    public List<AbstractCounterMessages> apply(Object parameter) {
-                        return ((GetTopListByCountersRes) parameter).getTopList();
-                    }
-                }, exec)
-                .recover(new Recover<List<AbstractCounterMessages>>() {
-                    public List<AbstractCounterMessages> recover(Throwable problem) throws Throwable {
-                        Logger.error("WorkerSupervisorActor: getFoodTopList() error: {}", problem.getMessage());
-                        return new ArrayList<>();
-                    }
-                }, exec);
+    private Future<LinkedHashMap<Countable, Integer>> getTopList(ActorRef actorRef, int top) {
+        return ask(actorRef, new GetTopListByCountersReq(top), 5000)
+            .map(new Mapper<Object, LinkedHashMap<Countable, Integer>>() {
+                @Override
+                public LinkedHashMap<Countable, Integer> apply(Object parameter) {
+                    return ((GetTopListByCountersRes) parameter).getTopList();
+                }
+            }, exec)
+            .recover(new Recover<LinkedHashMap<Countable, Integer>>() {
+                public LinkedHashMap<Countable, Integer> recover(Throwable problem) throws Throwable {
+                    Logger.error("WorkerSupervisorActor: getTopList() error: {}", problem.getMessage());
+                    return new LinkedHashMap<>();
+                }
+            }, exec);
     }
 
     private Review getReviewFromResultSet(ResultSet resultSet) throws SQLException {
+
         return new Review(
-                resultSet.getString("id"),
-                resultSet.getString("productId"),
+            resultSet.getString("id"),
+            new Product(resultSet.getString("productId")),
+            new Reviewer(
                 resultSet.getString("userId"),
-                resultSet.getString("profileName"),
-                resultSet.getString("helpfulnessNumerator"),
-                resultSet.getString("helpfulnessDenominator"),
-                resultSet.getString("score"),
-                resultSet.getString("time"),
-                resultSet.getString("summary"),
-                resultSet.getString("text"));
+                resultSet.getString("profileName")
+            ),
+            resultSet.getString("helpfulnessNumerator"),
+            resultSet.getString("helpfulnessDenominator"),
+            resultSet.getString("score"),
+            resultSet.getString("time"),
+            resultSet.getString("summary"),
+            resultSet.getString("text")
+        );
     }
 }

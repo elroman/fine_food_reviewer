@@ -1,5 +1,6 @@
-@(message: String)(userTopList: List[CounterUserActivity])(foodTopList: List[CounterCommentedFood])
-
+@import java.util
+@import models.review.Countable
+@(message: String)(userTopList: util.LinkedHashMap[Countable, Integer])(foodTopList: util.LinkedHashMap[Countable, Integer])(wordTopList: util.LinkedHashMap[Countable, Integer])
 @main("Welcome Fine food reviewer") {
 
     <div class="row">
@@ -12,6 +13,8 @@
                                 <th class="col-lg-5 col-md-5">User</th>
                                 <th class="col-lg-1 col-md-1"></th>
                                 <th class="col-lg-5 col-md-5">Product</th>
+                                <th class="col-lg-1 col-md-1"></th>
+                                <th class="col-lg-5 col-md-5">Words</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -20,25 +23,30 @@
                                     <table class="table table-bordered">
                                         <thead>
                                             <tr>
+                                                <th class="col-lg-2 col-md-2">#</th>
                                                 <th class="col-lg-6 col-md-6">User</th>
-                                                <th class="col-lg-3 col-md-3">User id</th>
-                                                <th class="col-lg-3 col-md-3">Counter</th>
+                                                <th class="col-lg-2 col-md-2">User id</th>
+                                                <th class="col-lg-2 col-md-2">Counter</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                        @for(user <- userTopList) {
+                                        @for((user, counter) <- userTopList) {
                                             <tr>
                                                 <td>
-                                                @user.getProfileName
+                                                   1
                                                 </td>
                                                 <td>
                                                 @user.getId
                                                 </td>
                                                 <td>
-                                                @user.getCounter
+                                                @user.getId
+                                                </td>
+                                                <td>
+                                                @counter
                                                 </td>
                                             </tr>
                                         }
+
                                         </tbody>
                                     </table>
                                 </td>
@@ -53,13 +61,37 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                        @for(product <- foodTopList) {
+                                        @for((product, counter) <- foodTopList) {
                                             <tr>
                                                 <td>
                                                 @product.getId
                                                 </td>
                                                 <td>
-                                                @product.getCounter
+                                                @counter
+                                                </td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </td>
+                                <td>
+                                </td>
+                                <td>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-lg-6 col-md-6">Word </th>
+                                                <th class="col-lg-3 col-md-3">Counter</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @for((word, counter) <- wordTopList) {
+                                            <tr>
+                                                <td>
+                                                @word.getId
+                                                </td>
+                                                <td>
+                                                @counter
                                                 </td>
                                             </tr>
                                         }

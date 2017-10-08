@@ -1,6 +1,6 @@
 package actors;
 
-public class UserHandlerActor
+public class WordHandlerActor
     extends AbstractCounterActor {
 
 }

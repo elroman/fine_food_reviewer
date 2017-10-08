@@ -1,19 +1,19 @@
 package actors.proto;
 
-import models.AbstractCounterMessages;
-
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+
+import models.review.Countable;
 
 public class GetTopListsRes {
 
-    private Map<String, List<AbstractCounterMessages>> topListsMap;
+    private Map<String, LinkedHashMap<Countable, Integer>> topListsMap;
 
-    public GetTopListsRes(Map<String, List<AbstractCounterMessages>> topListsMap) {
+    public GetTopListsRes(Map<String, LinkedHashMap<Countable, Integer>> topListsMap) {
         this.topListsMap = topListsMap;
     }
 
-    public Map<String, List<AbstractCounterMessages>> getTopListsMap() {
+    public Map<String, LinkedHashMap<Countable, Integer>> getTopListsMap() {
         return topListsMap;
     }
 }

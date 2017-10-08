@@ -1,25 +1,25 @@
 package actors.proto;
 
-import models.AbstractCounterMessages;
+import java.util.LinkedHashMap;
 
-import java.util.List;
+import models.review.Countable;
 
 public class GetTopListByCountersRes {
 
-    private List<AbstractCounterMessages> topList;
+    private LinkedHashMap<Countable, Integer> topList;
 
-    public GetTopListByCountersRes(List<AbstractCounterMessages> topList) {
+    public GetTopListByCountersRes(LinkedHashMap<Countable, Integer> topList) {
         this.topList = topList;
     }
 
-    public List<AbstractCounterMessages> getTopList() {
+    public LinkedHashMap<Countable, Integer> getTopList() {
         return topList;
     }
 
     @Override
     public String toString() {
         return "GetTopListByCountersRes{" +
-                "topList=" + topList +
-                '}';
+            "topList=" + topList +
+            '}';
     }
 }
