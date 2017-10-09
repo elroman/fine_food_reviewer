@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import actors.cmd.ClearMapCmd;
 import actors.proto.GetTopListByCountersReq;
 import actors.proto.GetTopListByCountersRes;
 import akka.actor.AbstractActor;
@@ -27,6 +28,7 @@ public abstract class AbstractCounterActor
     public PartialFunction<Object, BoxedUnit> receive() {
         return LoggingReceive.create(ReceiveBuilder
                                          .match(Countable.class, this::handleNewReview)
+                                         .match(ClearMapCmd.class, this::clearMap)
                                          .match(GetTopListByCountersReq.class, this::getTopList)
                                          .build(), getContext());
     }
@@ -36,7 +38,7 @@ public abstract class AbstractCounterActor
     }
 
     private void getTopList(GetTopListByCountersReq req) {
-        final LinkedHashMap<Countable, Integer> topList = counterReviewsMap.entrySet().stream()
+        final LinkedHashMap<Countable, Integer> topList = counterReviewsMap.entrySet().parallelStream()
             .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
             .limit(req.getTop())
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
@@ -48,5 +50,9 @@ public abstract class AbstractCounterActor
     Integer iterateCounter(Countable countableObject) {
         final Integer counter = counterReviewsMap.get(countableObject);
         return (counter != null) ? (1 + counter) : 1;
+    }
+
+    private void clearMap(ClearMapCmd cmd) {
+        counterReviewsMap.clear();
     }
 }

@@ -5,14 +5,13 @@ import static akka.pattern.Patterns.pipe;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import actors.cmd.ClearMapCmd;
 import actors.cmd.StartParseCmd;
 import actors.proto.GetTopListByCountersReq;
 import actors.proto.GetTopListByCountersRes;
@@ -26,7 +25,7 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.event.LoggingReceive;
 import akka.japi.pf.ReceiveBuilder;
-import models.review.CommentWord;
+import models.review.Comment;
 import models.review.Countable;
 import models.review.Product;
 import models.review.Review;
@@ -80,21 +79,26 @@ public class WorkerSupervisorActor
     private void startParse(StartParseCmd cmd) {
         ResultSet resultSet = parseFileService.getResultSetFromCsv(PATH_TO_FILE);
         logger.debug("Parse file started");
+
+        ClearMapCmd clearMapCmd = new ClearMapCmd();
+        userHandlerActor.forward(clearMapCmd, getContext());
+        foodHandlerActor.forward(clearMapCmd, getContext());
+        wordHandlerActor.forward(clearMapCmd, getContext());
+
         try {
             resultSet.next(); // first row is a head, we will skip it
             long startTime = System.nanoTime();
 
-            int coun = 0;
+            int counter = 0;
             while (resultSet.next()) {
                 final Review review = getReviewFromResultSet(resultSet);
                 userHandlerActor.forward(review.getReviewer(), getContext());
                 foodHandlerActor.forward(review.getProduct(), getContext());
                 textParserActor.forward(review.getComment(), getContext());
-                //                review.getComment().forEach(elem -> wordHandlerActor.forward(elem, getContext()));
 
-                coun++;
-                if ((coun % 1000) == 0) {
-                    logger.debug(" == Parsed : {}", coun);
+                counter++;
+                if ((counter % 10000) == 0) {
+                    logger.debug(" == Parsed : {}", counter);
                 }
             }
             logger.debug("Parse file finished. spent: {}", (System.nanoTime() - startTime) / 1000);
@@ -175,7 +179,7 @@ public class WorkerSupervisorActor
             resultSet.getString("score"),
             resultSet.getString("time"),
             resultSet.getString("summary"),
-            resultSet.getString("text")
+            new Comment(resultSet.getString("text"))
         );
     }
 }

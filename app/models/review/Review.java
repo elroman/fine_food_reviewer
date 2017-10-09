@@ -10,7 +10,7 @@ public class Review {
     private String score;
     private String time;
     private String summary;
-    private String comment;
+    private Comment comment;
 
     public Review(
         String id,
@@ -21,7 +21,7 @@ public class Review {
         String score,
         String time,
         String summary,
-        String comment
+        Comment comment
     ) {
         this.id = id;
         this.product = product;
@@ -66,7 +66,7 @@ public class Review {
         return summary;
     }
 
-    public String getComment() {
+    public Comment getComment() {
         return comment;
     }
 

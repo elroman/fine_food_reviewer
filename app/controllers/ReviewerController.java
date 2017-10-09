@@ -35,7 +35,7 @@ public class ReviewerController
     }
 
     public F.Promise<Result> getTopLists() {
-        return F.Promise.wrap(ask(workerSupervisorActor, new GetTopListsReq(20), 100000))
+        return F.Promise.wrap(ask(workerSupervisorActor, new GetTopListsReq(100), 100000))
             .map(res -> {
                 Map<String, LinkedHashMap<Countable, Integer>> topListMap = ((GetTopListsRes) res).getTopListsMap();
 
