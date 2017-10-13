@@ -1,5 +1,6 @@
 package controllers;
 
+import actors.cmd.SparkStartParseCmd;
 import actors.cmd.StartParseCmd;
 import akka.actor.ActorRef;
 import play.libs.F;
@@ -16,6 +17,11 @@ public class FileController extends Controller {
 
     public F.Promise<Result> startParseFile() {
         workerSupervisorActor.tell(new StartParseCmd(), ActorRef.noSender());
+        return F.Promise.pure((Result) redirect(routes.ReviewerController.index()));
+    }
+
+    public F.Promise<Result> startParseFileWithSpark() {
+        workerSupervisorActor.tell(new SparkStartParseCmd(), ActorRef.noSender());
         return F.Promise.pure((Result) redirect(routes.ReviewerController.index()));
     }
 }
